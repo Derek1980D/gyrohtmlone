@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Mobile Gyro Canvas Demo</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #121212;
+            color: #ffffff;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        #canvas {
+            border: 2px solid #333;
+            background-color: #1e1e1e;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+            max-width: 90vw;
+            max-height: 70vh;
+        }
+
+        #ui-container {
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        button {
+            background-color: #00adb5;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+            transition: background 0.2s;
+        }
+
+        button:active {
+            background-color: #007c82;
+        }
+
+        #debug {
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #888;
+        }
+    </style>
+</head>
+<body>
+
+    <canvas id="canvas" width="400" height="400"></canvas>
+
+    <div id="ui-container">
+        <button id="start-btn">Enable Sensors & Start</button>
+        <div id="debug">Tilt your phone to begin!</div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const startBtn = document.getElementById('start-btn');
+        const debugText = document.getElementById('debug');
+
+        // Physics & Ball Properties
+        let ball = {
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+            radius: 15,
+            vx: 0,
+            vy: 0,
+            color: '#00adb5'
+        };
+
+        // Tilt variables
+        let tiltX = 0; // Derived from Gamma (left/right)
+        let tiltY = 0; // Derived from Beta (front/back)
+        
+        // Sensitivity multipliers
+        const speedMultiplier = 0.15; 
+        const friction = 0.98; // Simulates drag so the ball smoothly slows down
+
+        // Update physics and draw the ball
+        function update() {
+            // Apply tilt forces to velocity
+            ball.vx += tiltX * speedMultiplier;
+            ball.vy += tiltY * speedMultiplier;
+
+            // Apply friction
+            ball.vx *= friction;
+            ball.vy *= friction;
+
+            // Update position
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Boundaries (Bounce off the walls)
+            if (ball.x - ball.radius < 0) {
+                ball.x = ball.radius;
+                ball.vx *= -0.5; // Lose some speed on bounce
+            } else if (ball.x + ball.radius > canvas.width) {
+                ball.x = canvas.width - ball.radius;
+                ball.vx *= -0.5;
+            }
+
+            if (ball.y - ball.radius < 0) {
+                ball.y = ball.radius;
+                ball.vy *= -0.5;
+            } else if (ball.y + ball.radius > canvas.height) {
+                ball.y = canvas.height - ball.radius;
+                ball.vy *= -0.5;
+            }
+
+            // Draw Everything
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Draw target center lines (like a level)
+            ctx.strokeStyle = '#333333';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+
+            // Draw the Ball
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+            ctx.fillStyle = ball.color;
+            ctx.fill();
+            ctx.closePath();
+
+            // Loop
+            requestAnimationFrame(update);
+        }
+
+        // Handle Device Orientation Data
+        function handleOrientation(event) {
+            // gamma: left-to-right tilt [-90, 90]
+            // beta: front-to-back tilt [-180, 180]
+            tiltX = event.gamma || 0; 
+            tiltY = event.beta || 0;
+
+            // Display values for debugging
+            debugText.innerText = `X (Gamma): ${Math.round(tiltX)}° | Y (Beta): ${Math.round(tiltY)}°`;
+        }
+
+        // Request permission and start listening
+        function initSensors() {
+            // Check if RequestPermission exists (iOS 13+ specific requirement, 
+            // but safe to run conditionally on Android/Pixel 10 as well)
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('deviceorientation', handleOrientation);
+                            startBtn.style.display = 'none';
+                        } else {
+                            debugText.innerText = "Permission to access sensors was denied.";
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // For non-iOS devices (like your Android Pixel 10)
+                window.addEventListener('deviceorientation', handleOrientation);
+                startBtn.style.display = 'none';
+            }
+
+            // Start the game loop
+            requestAnimationFrame(update);
+        }
+
+        // Trigger on user click
+        startBtn.addEventListener('click', initSensors);
+    </script>
+</body>
+</html>

@@ -1,2 +1,2 @@
 # gyrohtmlone
-gyro phone tests
+https://derek1980d.github.io/gyrohtmlone/
